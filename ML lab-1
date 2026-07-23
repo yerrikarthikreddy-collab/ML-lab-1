@@ -1,0 +1,172 @@
+import pandas as pd
+import numpy as np
+import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import RobustScaler, StandardScaler
+
+FILE_NAME = "Lab Session Data (1).xlsx"
+
+print("--- SECTION 1: PURCHASE DATA (A1 & A2) ---")
+df_purchase = pd.read_excel(FILE_NAME, sheet_name='Purchase data')
+
+X_purchase = df_purchase[['Candies (#)', 'Mangoes (Kg)', 'Milk Packets (#)']].values
+y_purchase = df_purchase['Payment (Rs)'].values.reshape(-1, 1)
+
+rank_X = np.linalg.matrix_rank(X_purchase)
+print(f"A1: Rank of Feature Matrix X: {rank_X}")
+
+X_pseudo_inv = np.linalg.pinv(X_purchase)
+costs = np.matmul(X_pseudo_inv, y_purchase)
+print(f"A1: Calculated Costs -> Candy: Rs {costs[0][0]:.2f}, Mango: Rs {costs[1][0]:.2f}, Milk: Rs {costs[2][0]:.2f}")
+
+df_purchase['Class'] = df_purchase['Payment (Rs)'].apply(lambda x: 'RICH' if x > 200 else 'POOR')
+y_class = df_purchase['Class']
+
+clf = LogisticRegression(random_state=42).fit(X_purchase, y_class)
+print(f"A2: Classifier Training Accuracy: {clf.score(X_purchase, y_class) * 100}%")
+print("-" * 50)
+
+
+print("\n--- SECTION 2: IRCTC STOCK PRICE (A3) ---")
+df_irctc = pd.read_excel(FILE_NAME, sheet_name='IRCTC Stock Price')
+price = df_irctc['Price']
+
+def custom_mean(data):
+    return sum(data) / len(data)
+
+def custom_var(data):
+    m = custom_mean(data)
+    return sum((x - m)**2 for x in data) / len(data)
+
+runs = 10
+start = time.time()
+for _ in range(runs): np.mean(price)
+t_np_mean = (time.time() - start) / runs
+
+start = time.time()
+for _ in range(runs): custom_mean(price)
+t_cust_mean = (time.time() - start) / runs
+
+print(f"A3: Population Mean: {np.mean(price):.2f}, Variance: {np.var(price):.2f}")
+print(f"A3: Numpy Mean Time: {t_np_mean:.7f}s | Custom Mean Time: {t_cust_mean:.7f}s")
+
+df_irctc['Date'] = pd.to_datetime(df_irctc['Date'])
+df_irctc['DayOfWeek'] = df_irctc['Date'].dt.day_name()
+df_irctc['Month'] = df_irctc['Date'].dt.month_name()
+
+wed_mean = df_irctc[df_irctc['DayOfWeek'] == 'Wednesday']['Price'].mean()
+apr_mean = df_irctc[df_irctc['Month'] == 'April']['Price'].mean()
+print(f"A3: Wednesday Sample Mean: {wed_mean:.2f} | April Sample Mean: {apr_mean:.2f}")
+
+prob_loss = len(df_irctc[df_irctc['Chg%'] < 0]) / len(df_irctc)
+prob_wed = len(df_irctc[df_irctc['DayOfWeek'] == 'Wednesday']) / len(df_irctc)
+prob_profit_and_wed = len(df_irctc[(df_irctc['Chg%'] > 0) & (df_irctc['DayOfWeek'] == 'Wednesday')]) / len(df_irctc)
+cond_prob = prob_profit_and_wed / prob_wed if prob_wed > 0 else 0
+
+print(f"A3: P(Loss) = {prob_loss:.4f}")
+print(f"A3: P(Profit AND Wednesday) = {prob_profit_and_wed:.4f}")
+print(f"A3: P(Profit | Wednesday) = {cond_prob:.4f}")
+
+plt.figure(figsize=(8, 4))
+plt.scatter(df_irctc['DayOfWeek'], df_irctc['Chg%'], color='blue', alpha=0.6)
+plt.title("Chg% vs Day of the Week")
+plt.xlabel("Day of the Week")
+plt.ylabel("Change %")
+plt.grid(True)
+plt.show()
+print("-" * 50)
+
+
+print("\n--- SECTION 3: THYROID DATA (A4 - A9) ---")
+df_th = pd.read_excel(FILE_NAME, sheet_name='thyroid0387_UCI')
+
+df_th.replace('?', np.nan, inplace=True)
+
+print("A4: Missing Values per Column:\n", df_th.isnull().sum()[df_th.isnull().sum() > 0])
+numeric_cols = df_th.select_dtypes(include=[np.number]).columns.tolist()
+
+print("\nA4: Numeric Attributes summary:")
+for col in numeric_cols:
+    if col != 'Record ID':
+        print(f"  {col}: Min={df_th[col].min()}, Max={df_th[col].max()}, Mean={df_th[col].mean():.2f}, Var={df_th[col].var():.2f}")
+
+binary_cols = [col for col in df_th.columns if set(df_th[col].dropna().unique()).issubset({0, 1, 'f', 't', 'F', 'T', 0.0, 1.0})]
+for col in binary_cols:
+    if df_th[col].dtype == object:
+        df_th[col] = df_th[col].map({'f': 0, 't': 1, 'F': 0, 'T': 1, 0: 0, 1: 1})
+
+vec1_bin = df_th.loc[0, binary_cols].fillna(0).values
+vec2_bin = df_th.loc[1, binary_cols].fillna(0).values
+
+f11 = np.sum((vec1_bin == 1) & (vec2_bin == 1))
+f00 = np.sum((vec1_bin == 0) & (vec2_bin == 0))
+f10 = np.sum((vec1_bin == 1) & (vec2_bin == 0))
+f01 = np.sum((vec1_bin == 0) & (vec2_bin == 1))
+
+JC = f11 / (f01 + f10 + f11) if (f01 + f10 + f11) > 0 else 0
+SMC = (f11 + f00) / (f00 + f01 + f10 + f11) if (f00 + f01 + f10 + f11) > 0 else 0
+print(f"\nA5: Jaccard Coefficient (JC) for Vector 1 & 2: {JC:.4f}")
+print(f"A5: Simple Matching Coefficient (SMC) for Vector 1 & 2: {SMC:.4f}")
+
+df_first2 = df_th.iloc[0:2].copy()
+for col in df_first2.columns:
+    if df_first2[col].dtype == object:
+        df_first2[col] = pd.Categorical(df_first2[col]).codes
+df_first2.fillna(0, inplace=True)
+
+cos_sim = cosine_similarity(df_first2.iloc[0:1].values, df_first2.iloc[1:2].values)[0][0]
+print(f"A6: Cosine Similarity for Vector 1 & 2: {cos_sim:.4f}")
+
+df_first20 = df_th.iloc[0:20].copy()
+for col in df_first20.columns:
+    if df_first20[col].dtype == object:
+        df_first20[col] = pd.Categorical(df_first20[col]).codes
+df_first20.fillna(0, inplace=True)
+
+jc_mat = np.zeros((20, 20))
+smc_mat = np.zeros((20, 20))
+cos_mat = cosine_similarity(df_first20.values)
+
+bin_data = df_th.loc[0:19, binary_cols].fillna(0).values
+for i in range(20):
+    for j in range(20):
+        vi, vj = bin_data[i], bin_data[j]
+        f11_20 = np.sum((vi == 1) & (vj == 1))
+        f00_20 = np.sum((vi == 0) & (vj == 0))
+        f10_20 = np.sum((vi == 1) & (vj == 0))
+        f01_20 = np.sum((vi == 0) & (vj == 1))
+        
+        den_jc = f01_20 + f10_20 + f11_20
+        jc_mat[i, j] = f11_20 / den_jc if den_jc > 0 else 0
+        
+        den_smc = f00_20 + f01_20 + f10_20 + f11_20
+        smc_mat[i, j] = (f11_20 + f00_20) / den_smc if den_smc > 0 else 0
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+sns.heatmap(jc_mat, annot=False, ax=axes[0], cmap="YlGnBu").set_title("Jaccard Coefficient")
+sns.heatmap(smc_mat, annot=False, ax=axes[1], cmap="YlGnBu").set_title("SMC")
+sns.heatmap(cos_mat, annot=False, ax=axes[2], cmap="YlGnBu").set_title("Cosine Similarity")
+plt.tight_layout()
+plt.show()
+
+df_imputed = df_th.copy()
+df_imputed['T4U'].fillna(df_imputed['T4U'].mean(), inplace=True) # Assuming no heavy outliers
+df_imputed['TSH'].fillna(df_imputed['TSH'].median(), inplace=True) # Highly skewed
+df_imputed['sex'].fillna(df_imputed['sex'].mode()[0], inplace=True) # Categorical mode
+
+print("\nA8: Imputation successfully applied (Mean for T4U, Median for TSH, Mode for Sex).")
+
+features_to_scale = ['age', 'TSH', 'T3', 'TT4', 'T4U', 'FTI']
+
+df_for_scaling = df_imputed[features_to_scale].dropna().copy()
+
+robust = RobustScaler()
+df_for_scaling[['age', 'TSH']] = robust.fit_transform(df_for_scaling[['age', 'TSH']])
+
+standard = StandardScaler()
+df_for_scaling[['T3', 'TT4', 'T4U', 'FTI']] = standard.fit_transform(df_for_scaling[['T3', 'TT4', 'T4U', 'FTI']])
+
+print("A9: Normalization successfully applied using RobustScaler (Outlier handling) and StandardScaler.")
