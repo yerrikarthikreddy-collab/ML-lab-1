@@ -1,0 +1,161 @@
+import time
+import unittest
+import numpy as np
+from scipy.spatial import distance
+import matplotlib.pyplot as plt
+
+# ==========================================
+# PART 1: LAB 03 MANUAL FUNCTIONS
+# ==========================================
+
+def calculate_minkowski_distance_manual(vec1, vec2, p):
+    """Calculates Minkowski distance using standard Python (Lab 03)."""
+    if len(vec1) != len(vec2):
+        raise ValueError("Vectors must be of the same length.")
+    return sum(abs(a - b) ** p for a, b in zip(vec1, vec2)) ** (1 / p)
+
+def calculate_mean_manual(data_matrix, axis=0):
+    """Calculates the mean for a matrix along a given axis (Lab 03)."""
+    matrix = np.array(data_matrix)
+    if axis == 0:
+        cols = matrix.shape[1]
+        rows = matrix.shape[0]
+        mean_vec = [sum(matrix[:, c]) / rows for c in range(cols)]
+        return np.array(mean_vec)
+    return None
+
+def k_means_clustering_manual(data, k, max_iters=100, p=2):
+    """Implements K-means clustering algorithm manually (Lab 03)."""
+    data = np.array(data)
+    np.random.seed(42)
+
+    random_indices = np.random.choice(len(data), size=k, replace=False)
+    centroids = data[random_indices]
+
+    for _ in range(max_iters):
+        clusters = [[] for _ in range(k)]
+        for point in data:
+            distances = [calculate_minkowski_distance_manual(point, c, p) for c in centroids]
+            closest_idx = np.argmin(distances)
+            clusters[closest_idx].append(point)
+
+        new_centroids = []
+        for cluster in clusters:
+            if not cluster:
+                new_centroids.append(data[np.random.choice(len(data))])
+            else:
+                new_centroids.append(calculate_mean_manual(cluster, axis=0))
+
+        new_centroids = np.array(new_centroids)
+
+        if np.allclose(centroids, new_centroids):
+            break
+        centroids = new_centroids
+
+    return centroids, clusters
+
+# ==========================================
+# PART 2: LAB 04 AI-GENERATED FUNCTIONS
+# GenAI Tool Used: Gemini
+# ==========================================
+
+def calculate_minkowski_distance_ai(vec1, vec2, p):
+    """Calculates Minkowski distance using numpy for vectorization."""
+    vec1, vec2 = np.array(vec1), np.array(vec2)
+    return np.sum(np.abs(vec1 - vec2) ** p) ** (1 / p)
+
+def k_means_clustering_ai(data, k, max_iters=100, p=2):
+    """Optimized K-means clustering algorithm using NumPy vectorization."""
+    data = np.array(data)
+    np.random.seed(42)
+
+    random_indices = np.random.choice(data.shape[0], size=k, replace=False)
+    centroids = data[random_indices]
+
+    for _ in range(max_iters):
+        # Calculate distances from all points to all centroids
+        distances = np.array([[calculate_minkowski_distance_ai(point, c, p) for c in centroids] for point in data])
+
+        # Assign points to the closest centroid
+        cluster_assignments = np.argmin(distances, axis=1)
+
+        # Recompute centroids using vectorized mean
+        new_centroids = np.array([data[cluster_assignments == i].mean(axis=0) if np.any(cluster_assignments == i)
+                                  else data[np.random.choice(data.shape[0])] for i in range(k)])
+
+        if np.allclose(centroids, new_centroids):
+            break
+        centroids = new_centroids
+
+    return centroids, cluster_assignments
+
+# ==========================================
+# PART 3: LAB 04 UNIT TESTS
+# GenAI Tool Used: Gemini
+# ==========================================
+
+class TestLabFunctions(unittest.TestCase):
+
+    def test_minkowski_distance_manual(self):
+        vec1 = [1, 2, 3]
+        vec2 = [4, 5, 6]
+        dist = calculate_minkowski_distance_manual(vec1, vec2, p=2)
+        expected_dist = np.linalg.norm(np.array(vec1) - np.array(vec2))
+        self.assertAlmostEqual(dist, expected_dist, places=4)
+
+    def test_minkowski_distance_ai(self):
+        vec1 = [1, 2, 3]
+        vec2 = [4, 5, 6]
+        dist = calculate_minkowski_distance_ai(vec1, vec2, p=2)
+        expected_dist = np.linalg.norm(np.array(vec1) - np.array(vec2))
+        self.assertAlmostEqual(dist, expected_dist, places=4)
+
+    def test_k_means_clustering(self):
+        # Simple dataset test for both algorithms
+        data = np.array([[1, 1], [1.5, 1.5], [8, 8], [8.5, 8.5]])
+
+        centroids_manual, _ = k_means_clustering_manual(data, k=2)
+        centroids_ai, _ = k_means_clustering_ai(data, k=2)
+
+        self.assertEqual(len(centroids_manual), 2)
+        self.assertEqual(len(centroids_ai), 2)
+
+# ==========================================
+# PART 4: LAB 04 PERFORMANCE COMPARISON
+# GenAI Tool Used: Gemini
+# ==========================================
+
+def run_performance_comparison():
+    print("===== K-Means Performance Comparison =====")
+    print("Generating dataset (1000 samples, 5 features) for testing...\n")
+    test_dataset = np.random.rand(1000, 5)
+
+    # Timing Manual Implementation
+    print("Starting Manual K-Means (Lab 03)...")
+    start_time_manual = time.time()
+    k_means_clustering_manual(test_dataset, k=3, max_iters=20)
+    end_time_manual = time.time()
+    manual_duration = end_time_manual - start_time_manual
+    print(f"-> Manual Execution Time: {manual_duration:.4f} seconds\n")
+
+    # Timing AI-Optimized Implementation
+    print("Starting AI-Optimized K-Means (Lab 04)...")
+    start_time_ai = time.time()
+    k_means_clustering_ai(test_dataset, k=3, max_iters=20)
+    end_time_ai = time.time()
+    ai_duration = end_time_ai - start_time_ai
+    print(f"-> AI-Optimized Execution Time: {ai_duration:.4f} seconds\n")
+
+    print(f"Performance Difference: AI version was {manual_duration / ai_duration:.2f}x faster.")
+
+# ==========================================
+# MAIN EXECUTION
+# ==========================================
+if __name__ == "__main__":
+    # 1. Run Unit Tests (pass argv to prevent Jupyter/Colab argument errors)
+    print("===== Running Unit Tests =====")
+    unittest.main(argv=['first-arg-is-ignored'], exit=False)
+    print("\n")
+
+    # 2. Run Performance Comparison
+    run_performance_comparison()
