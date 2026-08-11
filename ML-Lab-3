@@ -1,0 +1,194 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
+
+# ==========================================
+# A2: Label Encoding and One-Hot Encoding
+# ==========================================
+def label_encode(feature_list):
+    """Encodes categorical features into numeric labels."""
+    unique_elements = list(set(feature_list))
+    encoding_map = {val: idx for idx, val in enumerate(unique_elements)}
+    encoded_list = [encoding_map[val] for val in feature_list]
+    return encoded_list, encoding_map
+
+def one_hot_encode(feature_list):
+    """Encodes categorical features into a One-Hot matrix."""
+    unique_elements = list(set(feature_list))
+    encoding_map = {val: idx for idx, val in enumerate(unique_elements)}
+    one_hot_matrix = []
+    for val in feature_list:
+        row = [0] * len(unique_elements)
+        row[encoding_map[val]] = 1
+        one_hot_matrix.append(row)
+    return one_hot_matrix, encoding_map
+
+# ==========================================
+# A4: Generalized Minkowski Distance
+# ==========================================
+def calculate_minkowski_distance(vec1, vec2, p):
+    """Calculates Minkowski distance for order parameter p."""
+    if len(vec1) != len(vec2):
+        raise ValueError("Vectors must be of the same length.")
+    distance_val = sum(abs(a - b) ** p for a, b in zip(vec1, vec2)) ** (1 / p)
+    return distance_val
+
+# ==========================================
+# A7: Vector Dot Product and Euclidean Norm
+# ==========================================
+def calculate_dot_product(vec1, vec2):
+    """Calculates the dot product of two N-dimensional vectors."""
+    if len(vec1) != len(vec2):
+        raise ValueError("Vectors must be of the same length.")
+    return sum(a * b for a, b in zip(vec1, vec2))
+
+def calculate_euclidean_norm(vec):
+    """Calculates the Euclidean norm (length) of a vector."""
+    return sum(x ** 2 for x in vec) ** 0.5
+
+# ==========================================
+# A8: Mean, Variance, and Standard Deviation
+# ==========================================
+def calculate_mean(data_matrix, axis=0):
+    """Calculates the mean for a matrix along a given axis."""
+    matrix = np.array(data_matrix)
+    if axis == 0:
+        cols = matrix.shape[1]
+        rows = matrix.shape[0]
+        mean_vec = [sum(matrix[:, c]) / rows for c in range(cols)]
+        return np.array(mean_vec)
+    return None
+
+def calculate_variance(data_matrix, axis=0):
+    """Calculates the variance for a matrix along a given axis."""
+    matrix = np.array(data_matrix)
+    mean_vec = calculate_mean(matrix, axis)
+    if axis == 0:
+        cols = matrix.shape[1]
+        rows = matrix.shape[0]
+        var_vec = [sum((matrix[:, c] - mean_vec[c]) ** 2) / rows for c in range(cols)]
+        return np.array(var_vec)
+    return None
+
+def calculate_std(data_matrix, axis=0):
+    """Calculates the standard deviation for a matrix along a given axis."""
+    var_vec = calculate_variance(data_matrix, axis)
+    return np.array([v ** 0.5 for v in var_vec])
+
+# ==========================================
+# A11: K-means Algorithm
+# ==========================================
+def k_means_clustering(data, k, max_iters=100, p=2):
+    """Implements basic K-means clustering algorithm."""
+    data = np.array(data)
+
+    # Step 1: Select K points as initial centroids
+    np.random.seed(42)
+    random_indices = np.random.choice(len(data), size=k, replace=False)
+    centroids = data[random_indices]
+
+    for _ in range(max_iters):
+        # Step 3: Form K clusters by assigning each point to its closest centroid
+        clusters = [[] for _ in range(k)]
+        for point in data:
+            distances = [calculate_minkowski_distance(point, c, p) for c in centroids]
+            closest_idx = np.argmin(distances)
+            clusters[closest_idx].append(point)
+
+        # Step 4: Recompute the centroid of each cluster
+        new_centroids = []
+        for cluster in clusters:
+            if not cluster:
+                # Handle edge case for empty clusters to prevent division by zero
+                new_centroids.append(data[np.random.choice(len(data))])
+            else:
+                new_centroids.append(calculate_mean(cluster, axis=0))
+
+        new_centroids = np.array(new_centroids)
+
+        # Step 5: Stop condition - centroids do not change
+        if np.allclose(centroids, new_centroids):
+            break
+        centroids = new_centroids
+
+    return centroids, clusters
+
+
+# ==========================================
+# MAIN PROGRAM (Execution and Testing)
+# ==========================================
+if __name__ == "__main__":
+    # --- Dummy Data Initialization ---
+    sample_categorical = ['Single', 'Married', 'Single', 'Together', 'Divorced']
+    vector_a = [1.5, 2.0, 3.1, 4.2, 5.0]
+    vector_b = [5.1, 4.2, 3.3, 2.4, 1.0]
+    dataset_matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+
+    print("===== A3: Encoding Categorical Features =====")
+    lbl_encoded, lbl_map = label_encode(sample_categorical)
+    print(f"Label Encoded List: {lbl_encoded}")
+    print(f"Label Encoding Map: {lbl_map}\n")
+
+    ohe_encoded, ohe_map = one_hot_encode(sample_categorical)
+    print(f"One-Hot Encoded Matrix:\n{np.array(ohe_encoded)}")
+
+    print("\n===== A5 & A6: Minkowski Distance Comparison =====")
+    p_values = list(range(1, 11))
+    custom_dists = []
+    scipy_dists = []
+
+    for p in p_values:
+        dist_c = calculate_minkowski_distance(vector_a, vector_b, p)
+        dist_s = distance.minkowski(vector_a, vector_b, p)
+        custom_dists.append(dist_c)
+        scipy_dists.append(dist_s)
+
+    print(f"Custom Distances (p=1 to 10):\n{np.round(custom_dists, 4)}")
+    print(f"SciPy Distances (p=1 to 10):\n{np.round(scipy_dists, 4)}")
+
+    # Plotting Distance (A5)
+    plt.figure(figsize=(8, 4))
+    plt.plot(p_values, custom_dists, marker='o', label='Custom Minkowski')
+    plt.plot(p_values, scipy_dists, marker='x', linestyle='--', label='SciPy Minkowski')
+    plt.title("Minkowski Distance vs p-value (A5)")
+    plt.xlabel("p (Order Parameter)")
+    plt.ylabel("Calculated Distance")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    print("\n===== A7: Vector Operations =====")
+    print(f"Dot Product -> Custom: {calculate_dot_product(vector_a, vector_b):.4f}, Numpy: {np.dot(vector_a, vector_b):.4f}")
+    print(f"Euclidean Norm (Vec A) -> Custom: {calculate_euclidean_norm(vector_a):.4f}, Numpy: {np.linalg.norm(vector_a):.4f}")
+
+    print("\n===== A9: Statistical Functions Comparison =====")
+    print(f"Mean Vector -> Custom: {calculate_mean(dataset_matrix, axis=0)}")
+    print(f"Mean Vector -> Numpy:  {np.mean(dataset_matrix, axis=0)}")
+    print(f"Std Dev Vector -> Custom: {calculate_std(dataset_matrix, axis=0)}")
+    print(f"Std Dev Vector -> Numpy:  {np.std(dataset_matrix, axis=0)}")
+
+    print("\n===== A10: Histogram & Density Pattern =====")
+    # Generating a synthetic feature representing a single column of data
+    synthetic_feature = np.random.normal(loc=55, scale=12, size=500)
+    feat_mean = calculate_mean(synthetic_feature.reshape(-1, 1), axis=0)[0]
+    feat_var = calculate_variance(synthetic_feature.reshape(-1, 1), axis=0)[0]
+
+    print(f"Synthetic Feature -> Calculated Mean: {feat_mean:.2f}")
+    print(f"Synthetic Feature -> Calculated Variance: {feat_var:.2f}")
+
+    # Plotting Histogram
+    plt.figure(figsize=(8, 4))
+    counts, bins, patches = plt.hist(synthetic_feature, bins=15, edgecolor='black', alpha=0.75)
+    plt.title("Feature Density Histogram (A10)")
+    plt.xlabel("Value Buckets")
+    plt.ylabel("Frequency")
+    plt.grid(axis='y', alpha=0.6)
+    plt.show()
+
+    print("\n===== A11: K-Means Algorithm Implementation =====")
+    # Creating a dummy dataset with two distinct clusters
+    cluster_dataset = np.vstack((np.random.normal(20, 5, (50, 2)),
+                                 np.random.normal(70, 5, (50, 2))))
+
+    final_centroids, final_clusters = k_means_clustering(cluster_dataset, k=2)
+    print(f"Calculated Final Centroids for k=2:\n{final_centroids}")
