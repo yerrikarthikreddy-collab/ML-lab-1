@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+
+# Load the data from the exact provided file
+file_name = "Lab Session Data (1).xlsx"
+
+try:
+    # Note: The sheet name in the file is 'Purchase data' (lowercase 'd')
+    df = pd.read_excel(file_name, sheet_name='Purchase data')
+
+    # Segregate the data into matrices X and y
+    X = df[['Candies (#)', 'Mangoes (Kg)', 'Milk Packets (#)']].values
+    y = df['Payment (Rs)'].values.reshape(-1, 1)
+
+    print(f"Shape of Feature Matrix X: {X.shape}")
+    print(f"Shape of Output Vector y: {y.shape}")
+
+    # Calculate the rank of the feature matrix with numpy package
+    rank_X = np.linalg.matrix_rank(X)
+    print(f"\nRank of Feature Matrix X: {rank_X}")
+
+    # Using Pseudo-Inverse to find the cost of each product (c = X^+ y)
+    X_pseudo_inv = np.linalg.pinv(X)
+    costs = np.matmul(X_pseudo_inv, y)
+
+    print("\n--- Calculated Product Costs ---")
+    print(f"Cost of 1 Candy: Rs {costs[0][0]:.2f}")
+    print(f"Cost of 1 Kg of Mangoes: Rs {costs[1][0]:.2f}")
+    print(f"Cost of 1 Milk Packet: Rs {costs[2][0]:.2f}")
+
+except FileNotFoundError:
+    print(f"Error: The file '{file_name}' was not found in the current environment.")
+    print("Please upload the file 'Lab Session Data (1).xlsx' to your Colab session.")
+    print("You can do this by clicking the 'Files' icon on the left sidebar and then 'Upload to session storage',")
+    print("or by running `from google.colab import files; files.upload()` in a new code cell.")
+    print("\nExecution stopped. Please upload the file and run the cell again.")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
+    print("Please check the file content and sheet name.")
